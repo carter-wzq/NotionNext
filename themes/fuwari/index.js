@@ -93,13 +93,13 @@ const LayoutPostList = props => {
       {(category || tag) && (
         <div className='fuwari-card p-5 mb-4'>
           <p className='text-sm uppercase tracking-widest text-[var(--fuwari-muted)] mb-2'>
-            {category ? (locale?.COMMON?.CATEGORY || '分类') : (locale?.COMMON?.TAGS || '标签')}
+            {category ? (locale?.COMMON?.CATEGORY || 'Category') : (locale?.COMMON?.TAGS || 'Tags')}
           </p>
           <div className='flex items-center gap-2'>
             <h1 className='fuwari-section-title text-2xl font-bold'>
               {category || `#${tag}`}
             </h1>
-            <span className='fuwari-chip'>{category ? (locale?.COMMON?.CATEGORY || '分类') : (locale?.COMMON?.TAGS || '标签')}</span>
+            <span className='fuwari-chip'>{category ? (locale?.COMMON?.CATEGORY || 'Category') : (locale?.COMMON?.TAGS || 'Tags')}</span>
           </div>
         </div>
       )}
@@ -175,9 +175,9 @@ const LayoutArchive = props => {
     <>
       <div className='fuwari-card p-6 mb-4'>
         <p className='text-sm uppercase tracking-widest text-[var(--fuwari-muted)] mb-2'>
-          {locale?.NAV?.ARCHIVE || '归档'}
+          {locale?.NAV?.ARCHIVE || 'Archive'}
         </p>
-        <h1 className='text-3xl font-bold leading-tight'>{locale?.NAV?.ARCHIVE || '归档'}</h1>
+        <h1 className='text-3xl font-bold leading-tight'>{locale?.NAV?.ARCHIVE || 'Archive'}</h1>
       </div>
       <ArchiveList archivePosts={props.archivePosts || {}} />
     </>
@@ -190,9 +190,9 @@ const Layout404 = () => {
     <div className='fuwari-card p-8 text-center'>
       <h1 className='text-4xl font-bold mb-2'>404</h1>
       <p className='text-sm text-[var(--fuwari-muted)] mb-4'>
-        {locale?.NAV?.['404'] || '页面不存在'}
+        {locale?.NAV?.['404'] || 'Page not found'}
       </p>
-      <SmartLink href='/' className='fuwari-link'>{locale?.NAV?.INDEX || '首页'}</SmartLink>
+      <SmartLink href='/' className='fuwari-link'>{locale?.NAV?.INDEX || 'Home'}</SmartLink>
     </div>
   )
 }
@@ -202,7 +202,7 @@ const LayoutCategoryIndex = props => {
   const { categoryOptions } = props
   return (
     <div className='fuwari-card p-5'>
-      <h2 className='fuwari-section-title text-2xl font-semibold mb-4'>{locale?.COMMON?.CATEGORY || '分类'}</h2>
+      <h2 className='fuwari-section-title text-2xl font-semibold mb-4'>{locale?.COMMON?.CATEGORY || 'Category'}</h2>
       <div className='flex flex-wrap gap-2'>
         {(categoryOptions || []).map(c => (
           <SmartLink
@@ -222,7 +222,7 @@ const LayoutTagIndex = props => {
   const { tagOptions } = props
   return (
     <div className='fuwari-card p-5'>
-      <h2 className='fuwari-section-title text-2xl font-semibold mb-4'>{locale?.COMMON?.TAGS || '标签'}</h2>
+      <h2 className='fuwari-section-title text-2xl font-semibold mb-4'>{locale?.COMMON?.TAGS || 'Tags'}</h2>
       <div className='flex flex-wrap gap-2'>
         {(tagOptions || []).map(t => (
           <SmartLink

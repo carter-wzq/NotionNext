@@ -59,7 +59,7 @@ const SidePanel = props => {
       {showToc && (
         <section className='fuwari-card p-4'>
           <h3 className='text-sm font-semibold mb-3 px-3 tracking-wide uppercase text-[var(--fuwari-muted)]'>
-            {locale?.ARTICLE?.TABLE_OF_CONTENT || '目录'}
+            {locale?.ARTICLE?.TABLE_OF_CONTENT || 'Table of contents'}
           </h3>
           <Toc toc={post.toc} />
         </section>
@@ -68,13 +68,13 @@ const SidePanel = props => {
       {siteConfig('FUWARI_WIDGET_NOTICE', true, CONFIG) &&
         notice &&
         Object.keys(notice).length > 0 && (
-          <Announcement post={notice} title={locale?.COMMON?.ANNOUNCEMENT || '公告'} className='p-5' />
+          <Announcement post={notice} title={locale?.COMMON?.ANNOUNCEMENT || 'Announcement'} className='p-5' />
       )}
 
       {siteConfig('FUWARI_WIDGET_LATEST_POSTS', true, CONFIG) && latestPosts.length > 0 && (
         <section className='fuwari-card p-5'>
           <h3 className='text-sm font-semibold mb-3 tracking-wide uppercase text-[var(--fuwari-muted)]'>
-            {locale?.COMMON?.LATEST_POSTS || '最新发布'}
+            {locale?.COMMON?.LATEST_POSTS || 'Latest posts'}
           </h3>
           <div className='space-y-2'>
             {latestPosts.slice(0, 6).map(p => (
@@ -92,7 +92,7 @@ const SidePanel = props => {
       {siteConfig('FUWARI_WIDGET_CATEGORY_LIST', true, CONFIG) && categoryOptions.length > 0 && (
         <section className='fuwari-card p-5'>
           <h3 className='fuwari-section-title text-sm font-semibold mb-3 tracking-wide uppercase text-[var(--fuwari-muted)]'>
-            {locale?.COMMON?.CATEGORY || '分类'}
+            {locale?.COMMON?.CATEGORY || 'Category'}
           </h3>
           <div className='flex flex-wrap gap-2'>
             {categoryOptions.slice(0, 14).map(c => (
@@ -110,7 +110,7 @@ const SidePanel = props => {
       {siteConfig('FUWARI_WIDGET_TAG_LIST', true, CONFIG) && tagOptions.length > 0 && (
         <section className='fuwari-card p-5'>
           <h3 className='fuwari-section-title text-sm font-semibold mb-3 tracking-wide uppercase text-[var(--fuwari-muted)]'>
-            {locale?.COMMON?.TAGS || '标签'}
+            {locale?.COMMON?.TAGS || 'Tags'}
           </h3>
           <div className='flex flex-wrap gap-2'>
             {tagOptions.slice(0, 28).map(t => (

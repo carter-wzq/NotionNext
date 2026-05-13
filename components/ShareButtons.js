@@ -15,7 +15,7 @@ const SHARE_ICON_CLASS = {
   line: 'fab fa-line',
   reddit: 'fab fa-reddit-alien',
   email: 'fas fa-envelope',
-  twitter: 'fab fa-x-twitter',
+  twitter: 'fab fa-twitter',
   telegram: 'fab fa-telegram-plane',
   whatsapp: 'fab fa-whatsapp',
   linkedin: 'fab fa-linkedin-in',

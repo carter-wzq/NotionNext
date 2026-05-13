@@ -18,7 +18,7 @@ const AnalyticsCard = ({ postCount = 0, categoryOptions = [], tagOptions = [] })
 
   // zh-* 的 COMMON.POSTS 多为「篇文章」，不适合单独作统计标签，改用「文章」
   const postsLabel = /^zh-(CN|TW|HK)$/i.test(lang || '')
-    ? locale?.COMMON?.ARTICLE || '文章'
+    ? locale?.COMMON?.ARTICLE || 'Article'
     : locale?.COMMON?.POSTS || locale?.COMMON?.ARTICLE || 'Posts'
 
   const title = locale?.COMMON?.ANALYTICS || 'Analytics'

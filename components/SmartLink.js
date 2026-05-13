@@ -31,20 +31,35 @@ const filterLinkProps = props => {
   return rest
 }
 
+/**
+ * Next.js <Link> 不允许 href 为 undefined；Notion 失败占位、菜单缺字段时会传入空值。
+ */
+function normalizeHrefForLink(href) {
+  if (href == null || href === '') return '/'
+  if (typeof href === 'object' && href !== null) {
+    const p = href.pathname
+    if (p == null || p === '') {
+      return { ...href, pathname: '/' }
+    }
+  }
+  return href
+}
+
 const SmartLink = ({ href, children, ...rest }) => {
   const LINK = siteConfig('LINK')
+  const safeHref = normalizeHrefForLink(href)
 
   // 获取 URL 字符串用于判断是否是外链
   let urlString = ''
 
-  if (typeof href === 'string') {
-    urlString = href
+  if (typeof safeHref === 'string') {
+    urlString = safeHref
   } else if (
-    typeof href === 'object' &&
-    href !== null &&
-    typeof href.pathname === 'string'
+    typeof safeHref === 'object' &&
+    safeHref !== null &&
+    typeof safeHref.pathname === 'string'
   ) {
-    urlString = href.pathname
+    urlString = safeHref.pathname
   }
 
   const isExternal = urlString.startsWith('http') && !urlString.startsWith(LINK)
@@ -93,7 +108,9 @@ const SmartLink = ({ href, children, ...rest }) => {
   if (isExternal) {
     // 对于外部链接，必须是 string 类型
     const externalUrl =
-      typeof href === 'string' ? href : new URL(href.pathname, LINK).toString()
+      typeof safeHref === 'string'
+        ? safeHref
+        : new URL(safeHref.pathname, LINK).toString()
 
     return (
       <a
@@ -108,9 +125,9 @@ const SmartLink = ({ href, children, ...rest }) => {
 
   // 内部链接（可为对象形式）
   const mergedHref =
-    typeof href === 'string'
-      ? mergePreservedQueryForStringHref(href)
-      : mergePreservedQueryForObjectHref(href)
+    typeof safeHref === 'string'
+      ? mergePreservedQueryForStringHref(safeHref)
+      : mergePreservedQueryForObjectHref(safeHref)
 
   return (
     <Link href={mergedHref} {...filterLinkProps(rest)}>

@@ -13,6 +13,9 @@ module.exports = {
 
   // 未设置 ENABLE_CACHE 时：build/export 默认开启；next dev 下 NODE_ENV=development 也默认开启，便于本地命中 file+memory 缓存。
   // 若不想用缓存，请在 .env.local 中设置 ENABLE_CACHE=false（字符串即可）。
+  //
+  // 本地频繁改 Notion 配置又不想每次删 .next/cache/notion：在 .env.local 设置
+  // NOTION_DEV_CACHE_SECONDS=5（数字秒，≥0；与 lib/cache 中逻辑配合，会关闭 dev 下 file 缓存并缩短内存缓存 TTL）。
   ENABLE_CACHE:
     process.env.ENABLE_CACHE ||
     process.env.npm_lifecycle_event === 'build' ||

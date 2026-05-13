@@ -35,8 +35,10 @@ const PostCard = ({ post }) => {
     360,
     Math.max(200, Number(siteConfig('FUWARI_POST_LIST_COVER_COL_WIDTH', 280, CONFIG)) || 280)
   )
+  // 与详情 ArticleHeroCover 一致：pageCover → pageCoverThumbnail
+  const notionCover = post.pageCover || post.pageCoverThumbnail
   const coverSrc =
-    post.pageCoverThumbnail ||
+    notionCover ||
     (siteConfig('FUWARI_POST_LIST_COVER_DEFAULT', false, CONFIG) &&
       siteConfig('HOME_BANNER_IMAGE'))
   const [coverFailed, setCoverFailed] = useState(false)

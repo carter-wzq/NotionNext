@@ -1,6 +1,7 @@
 import { deepClone } from '@/lib/utils'
 
 export function cleanIds(items?: any[]) {
+  if (items == null) return []
   if (!Array.isArray(items)) return items
   return deepClone(items.map(i => {
     delete i.id

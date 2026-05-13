@@ -4,6 +4,23 @@
 module.exports = {
   // 文章URL前缀
   POST_URL_PREFIX: process.env.NEXT_PUBLIC_POST_URL_PREFIX ?? 'article',
+  // Notion「分类」Select 选项名 → URL 片段（小写）；仅当 POST_URL_PREFIX 含 %category% 时参与生成 href。
+  // 与建议的三类一致：Playbooks / Product / Perspectives。可用 NEXT_PUBLIC_POST_URL_PREFIX_MAPPING_CATEGORY 覆盖。
+  POST_URL_PREFIX_MAPPING_CATEGORY: (() => {
+    const raw = process.env.NEXT_PUBLIC_POST_URL_PREFIX_MAPPING_CATEGORY
+    if (raw && String(raw).trim().startsWith('{')) {
+      try {
+        return JSON.parse(String(raw).replace(/\s+/g, ' ').trim())
+      } catch (e) {
+        console.warn('[post.config] POST_URL_PREFIX_MAPPING_CATEGORY JSON invalid', e)
+      }
+    }
+    return {
+      Playbooks: 'playbooks',
+      Product: 'product',
+      Perspectives: 'perspectives'
+    }
+  })(),
   // POST类型文章的默认路径前缀，例如默认POST类型的路径是  /article/[slug]
   // 如果此项配置为 '' 空， 则文章将没有前缀路径
   // 支援類似 WP 可自訂文章連結格式的功能：https://wordpress.org/documentation/article/customize-permalinks/，目前只先實作 %year%/%month%/%day%
@@ -16,8 +33,8 @@ module.exports = {
   POST_SHARE_BAR_ENABLE: process.env.NEXT_PUBLIC_POST_SHARE_BAR || 'true', //文章底部分享条开关
   POSTS_SHARE_SERVICES:
     process.env.NEXT_PUBLIC_POST_SHARE_SERVICES ||
-    'link,wechat,qq,weibo,email,facebook,twitter,telegram,messenger,line,reddit,whatsapp,linkedin,csdn,juejin', // 分享的服務，按顺序显示,逗号隔开
-  // 所有支持的分享服务：link(复制链接),wechat(微信),qq,weibo(微博),email(邮件),facebook,twitter,telegram,messenger,line,reddit,whatsapp,linkedin,vkshare,okshare,tumblr,livejournal,mailru,viber,workplace,pocket,instapaper,hatena
+    'link,email,facebook,twitter,telegram,messenger,line,reddit,whatsapp,linkedin,pocket', // 分享的服務，按顺序显示,逗号隔开（默认已去掉微信/QQ/微博/CSDN/掘金等国内项）
+  // 所有支持的分享服务：link(复制链接),wechat(微信),qq,weibo(微博),email(邮件),facebook,twitter,telegram,messenger,line,reddit,whatsapp,linkedin,vkshare,okshare,tumblr,livejournal,mailru,viber,workplace,pocket,instapaper,hatena,csdn,juejin
 
   POST_TITLE_ICON: process.env.NEXT_PUBLIC_POST_TITLE_ICON || true, // 是否显示标题icon
   POST_DISABLE_GALLERY_CLICK:

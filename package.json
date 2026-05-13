@@ -17,9 +17,9 @@
     "url": "http://tangly1024.com"
   },
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3001",
     "build": "cross-env BUILD_MODE=true next build",
-    "start": "next start",
+    "start": "next start -p 3001",
     "post-build": "next-sitemap --config next-sitemap.config.js",
     "export": "cross-env BUILD_MODE=true EXPORT=true next build && next-sitemap --config next-sitemap.config.js",
     "bundle-report": "cross-env ANALYZE=true next build",
