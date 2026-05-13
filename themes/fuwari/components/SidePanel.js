@@ -32,29 +32,31 @@ const SidePanel = props => {
 
   return (
     <aside className='space-y-4'>
-      <section className='fuwari-card fuwari-profile-card p-4'>
-        <SmartLink href={siteConfig('FUWARI_PROFILE_PATH', '/about', CONFIG)} className='fuwari-profile-link block mb-2.5'>
-          <div className='fuwari-profile-thumb relative overflow-hidden rounded-2xl'>
-            <LazyImage
-              src={siteInfo?.icon}
-              alt={siteConfig('AUTHOR') || title}
-              className='w-full aspect-square object-cover'
-            />
-            <span className='fuwari-profile-overlay' aria-hidden='true'>
-              <i className='far fa-id-card' />
-            </span>
+      {siteConfig('FUWARI_WIDGET_PROFILE', true, CONFIG) && (
+        <section className='fuwari-card fuwari-profile-card p-4'>
+          <SmartLink href={siteConfig('FUWARI_PROFILE_PATH', '/about', CONFIG)} className='fuwari-profile-link block mb-2.5'>
+            <div className='fuwari-profile-thumb relative overflow-hidden rounded-2xl'>
+              <LazyImage
+                src={siteInfo?.icon}
+                alt={siteConfig('AUTHOR') || title}
+                className='w-full aspect-square object-cover'
+              />
+              <span className='fuwari-profile-overlay' aria-hidden='true'>
+                <i className='far fa-id-card' />
+              </span>
+            </div>
+          </SmartLink>
+          <h2 className='text-xl font-semibold mb-1'>{siteConfig('AUTHOR') || title}</h2>
+          {description && (
+            <p className='text-sm leading-6 text-[var(--fuwari-muted)]'>
+              {description}
+            </p>
+          )}
+          <div className='pt-3 mt-3 border-t border-[var(--fuwari-border)]'>
+            <SocialButton />
           </div>
-        </SmartLink>
-        <h2 className='text-xl font-semibold mb-1'>{siteConfig('AUTHOR') || title}</h2>
-        {description && (
-          <p className='text-sm leading-6 text-[var(--fuwari-muted)]'>
-            {description}
-          </p>
-        )}
-        <div className='pt-3 mt-3 border-t border-[var(--fuwari-border)]'>
-          <SocialButton />
-        </div>
-      </section>
+        </section>
+      )}
 
       {showToc && (
         <section className='fuwari-card p-4'>
@@ -77,7 +79,10 @@ const SidePanel = props => {
             {locale?.COMMON?.LATEST_POSTS || 'Latest posts'}
           </h3>
           <div className='space-y-2'>
-            {latestPosts.slice(0, 6).map(p => (
+            {latestPosts
+              .filter(p => p?.type === 'Post' && p?.status === 'Published')
+              .slice(0, 6)
+              .map(p => (
               <SmartLink
                 key={p.id}
                 href={p.href || `/${p.slug}`}
