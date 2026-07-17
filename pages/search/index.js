@@ -51,11 +51,7 @@ export async function getStaticProps({ locale }) {
     props,
     revalidate: process.env.EXPORT
       ? undefined
-      : siteConfig(
-          'NEXT_REVALIDATE_SECOND',
-          BLOG.NEXT_REVALIDATE_SECOND,
-          props.NOTION_CONFIG
-        )
+      : 3600 // 搜索页缓存1小时，减少服务端CPU消耗
   }
 }
 

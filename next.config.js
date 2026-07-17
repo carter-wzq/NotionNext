@@ -185,9 +185,9 @@ const nextConfig = {
   images: {
     // 图片压缩和格式优化
     formats: ['image/avif', 'image/webp'],
-    // 图片尺寸优化
-    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
-    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+    // 图片尺寸优化 — 精简尺寸减少Vercel图片处理变体数量（8+8→4+4，变体数减半）
+    deviceSizes: [640, 1080, 1920, 3840],
+    imageSizes: [16, 64, 128, 384],
     // NotionNext 站长图源不可控（任意外链），这里放开 http/https 远程图片来源
     // 说明：这会显著降低“域名白名单漏配导致图片不显示”的概率
     remotePatterns: [

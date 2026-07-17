@@ -1,5 +1,5 @@
 import BLOG from '@/blog.config'
-import { getDataFromCache } from '@/lib/cache/cache_manager'
+import { getDataFromCache, setDataToCache } from '@/lib/cache/cache_manager'
 import { siteConfig } from '@/lib/config'
 import { fetchGlobalAllData } from '@/lib/db/SiteDataApi'
 import { DynamicLayout } from '@/themes/theme'
@@ -44,11 +44,7 @@ export async function getStaticProps({ params: { keyword }, locale }) {
     props,
     revalidate: process.env.EXPORT
       ? undefined
-      : siteConfig(
-          'NEXT_REVALIDATE_SECOND',
-          BLOG.NEXT_REVALIDATE_SECOND,
-          props.NOTION_CONFIG
-        )
+      : 3600 // 搜索页缓存1小时，减少服务端CPU消耗
   }
 }
 
@@ -66,10 +62,19 @@ export function getStaticPaths() {
  * @returns
  */
 async function filterByMemCache(allPosts, keyword) {
-  const filterPosts = []
-  if (keyword) {
-    keyword = keyword.trim().toLowerCase()
+  const normalizedKeyword = keyword ? keyword.trim().toLowerCase() : ''
+  if (!normalizedKeyword) return []
+
+  // 检查搜索缓存
+  const searchCacheKey = `search_${normalizedKeyword}`
+  const cachedIds = await getDataFromCache(searchCacheKey, true)
+  if (cachedIds && Array.isArray(cachedIds)) {
+    console.log(`[搜索缓存命中] keyword: ${normalizedKeyword}, cached: ${cachedIds.length} results`)
+    return allPosts.filter(p => cachedIds.includes(p.id))
   }
+
+  const filterPosts = []
+  keyword = normalizedKeyword
   for (const post of allPosts) {
     const cacheKey = 'page_block_' + post.id
     const page = await getDataFromCache(cacheKey, true)
@@ -105,6 +110,14 @@ async function filterByMemCache(allPosts, keyword) {
       filterPosts.push(post)
     }
   }
+
+  // 缓存搜索结果（仅缓存 ID 列表，避免缓存完整的 post 对象导致数据过时）
+  if (filterPosts.length > 0) {
+    const idsToCache = filterPosts.map(p => p.id)
+    await setDataToCache(searchCacheKey, idsToCache, 1800) // 30分钟缓存
+    console.log(`[搜索缓存写入] keyword: ${normalizedKeyword}, ${idsToCache.length} results`)
+  }
+
   return filterPosts
 }
 
