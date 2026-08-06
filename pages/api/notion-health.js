@@ -3,6 +3,7 @@ import notionAPI from '@/lib/db/notion/getNotionAPI'
 import { fetchGlobalAllData, getPostBlocks } from '@/lib/db/SiteDataApi'
 import { adapterNotionBlockMap } from '@/lib/utils/notion.util'
 import { normalizeNotionMetadata } from '@/lib/db/notion/normalizeUtil'
+import { delCacheData } from '@/lib/cache/cache_manager'
 import { idToUuid } from 'notion-utils'
 
 /**
