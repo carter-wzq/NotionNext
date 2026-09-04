@@ -3,7 +3,7 @@ import notionAPI from '@/lib/db/notion/getNotionAPI'
 import { fetchGlobalAllData, getPostBlocks } from '@/lib/db/SiteDataApi'
 import { adapterNotionBlockMap } from '@/lib/utils/notion.util'
 import { normalizeNotionMetadata } from '@/lib/db/notion/normalizeUtil'
-import { delCacheData } from '@/lib/cache/cache_manager'
+import { delCacheByPrefix, delCacheData } from '@/lib/cache/cache_manager'
 import { idToUuid } from 'notion-utils'
 
 /**
@@ -34,7 +34,7 @@ export default async function handler(req, res) {
     steps: {}
   }
 
-  // 可选：清掉站点/页面缓存（修复 Redis 毒化 EmptyData）
+  // 清 Redis：站点索引 + 全部文章 block（旧缓存没有缩略图/新内链）
   if (String(req.query?.flush || '') === '1') {
     const keys = [`site_${pageId}`, `page_block_${pageId}`]
     for (const cacheKey of keys) {
@@ -43,6 +43,31 @@ export default async function handler(req, res) {
         result.steps[`flush_${cacheKey}`] = 'deleted'
       } catch (e) {
         result.steps[`flush_${cacheKey}`] = String(e?.message || e)
+      }
+    }
+    try {
+      result.steps.flush_site_prefix = await delCacheByPrefix('site_')
+      result.steps.flush_page_block_prefix = await delCacheByPrefix(
+        'page_block_'
+      )
+    } catch (e) {
+      result.steps.flush_prefix = String(e?.message || e)
+    }
+    const revalidatePaths = [
+      '/',
+      '/archive',
+      '/article/what-is-social-listening',
+      '/article/reddit-marketing-for-saas',
+      '/article/8-best-brand24-alternatives-in-2026',
+      '/article/how-to-find-subreddits-for-saas'
+    ]
+    result.steps.revalidate = {}
+    for (const path of revalidatePaths) {
+      try {
+        await res.revalidate(path)
+        result.steps.revalidate[path] = 'ok'
+      } catch (e) {
+        result.steps.revalidate[path] = String(e?.message || e)
       }
     }
   }
