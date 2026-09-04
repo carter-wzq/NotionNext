@@ -34,6 +34,19 @@ export default async function handler(req, res) {
     steps: {}
   }
 
+  // 可选：清掉站点/页面缓存（修复 Redis 毒化 EmptyData）
+  if (String(req.query?.flush || '') === '1') {
+    const keys = [`site_${pageId}`, `page_block_${pageId}`]
+    for (const cacheKey of keys) {
+      try {
+        await delCacheData(cacheKey)
+        result.steps[`flush_${cacheKey}`] = 'deleted'
+      } catch (e) {
+        result.steps[`flush_${cacheKey}`] = String(e?.message || e)
+      }
+    }
+  }
+
   // 1) notion-client getPage
   try {
     const start = Date.now()

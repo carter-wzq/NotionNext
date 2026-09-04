@@ -1,5 +1,6 @@
 import SmartLink from '@/components/SmartLink'
 import { siteConfig } from '@/lib/config'
+import { compressImage } from '@/lib/db/notion/mapImage'
 import { useRouter } from 'next/router'
 import { useState } from 'react'
 import CONFIG from '../config'
@@ -31,37 +32,48 @@ const getArchiveHref = (publishDay, router) => {
 
 const PostCard = ({ post }) => {
   const router = useRouter()
-  const coverColPx = Math.min(
-    360,
-    Math.max(200, Number(siteConfig('FUWARI_POST_LIST_COVER_COL_WIDTH', 280, CONFIG)) || 280)
+  const thumbPx = Math.min(
+    200,
+    Math.max(96, Number(siteConfig('FUWARI_POST_LIST_COVER_COL_WIDTH', 148, CONFIG)) || 148)
   )
-  // 与详情 ArticleHeroCover 一致：pageCover → pageCoverThumbnail
-  const notionCover = post.pageCover || post.pageCoverThumbnail
-  const coverSrc =
-    notionCover ||
+  const rawCover =
+    post.firstContentImage ||
+    post.pageCover ||
+    post.pageCoverThumbnail ||
     (siteConfig('FUWARI_POST_LIST_COVER_DEFAULT', false, CONFIG) &&
       siteConfig('HOME_BANNER_IMAGE'))
+  const coverSrc = rawCover ? compressImage(rawCover, 400) : rawCover
   const [coverFailed, setCoverFailed] = useState(false)
   const showCover = Boolean(coverSrc) && !coverFailed
-  const showRail = !showCover
   const listCoverOn = siteConfig('FUWARI_POST_LIST_COVER', true, CONFIG)
   const showCoverBlock = listCoverOn && showCover
 
-  const gridTemplateColumns = (() => {
-    if (showCoverBlock) {
-      return `minmax(0, 1fr) ${coverColPx}px`
-    }
-    if (showRail) {
-      return `minmax(0, 1fr) 56px`
-    }
-    return 'minmax(0, 1fr)'
-  })()
+  const gridTemplateColumns = showCoverBlock
+    ? `${thumbPx}px minmax(0, 1fr)`
+    : 'minmax(0, 1fr)'
 
   return (
     <article className='fuwari-card fuwari-card-hover p-4 relative w-full max-w-full min-w-0'>
       <div
-        className={`fuwari-post-card-grid w-full min-w-0 md:grid md:gap-4 md:items-stretch min-h-[178px]`}
-        style={{ gridTemplateColumns }}>
+        className={`fuwari-post-card-grid w-full min-w-0 grid gap-3 md:gap-4 items-start ${showCoverBlock ? 'fuwari-post-card-grid--thumb' : ''}`}
+        style={showCoverBlock ? { '--fuwari-thumb-col': `${thumbPx}px`, gridTemplateColumns } : undefined}>
+        {showCoverBlock && (
+          <SmartLink
+            href={post.href || `/${post.slug}`}
+            className='fuwari-thumb-link shrink-0'>
+            <div
+              className={`fuwari-thumb-wrap ${siteConfig('FUWARI_POST_LIST_COVER_HOVER_ENLARGE', true, CONFIG) ? 'fuwari-cover-enlarge' : ''}`}>
+              <img
+                src={coverSrc}
+                alt={post.title}
+                loading='lazy'
+                decoding='async'
+                className='fuwari-thumb-img'
+                onError={() => setCoverFailed(true)}
+              />
+            </div>
+          </SmartLink>
+        )}
         <div className='min-w-0 flex-1 md:pr-1'>
           <h2 className='fuwari-post-title text-[2rem] font-bold mb-1.5 leading-tight'>
             <SmartLink href={post.href || `/${post.slug}`} className='hover:opacity-90 transition-opacity'>
@@ -103,26 +115,6 @@ const PostCard = ({ post }) => {
             </p>
           )}
         </div>
-        {showCoverBlock && (
-          <div className='mt-4 md:mt-0'>
-            <SmartLink href={post.href || `/${post.slug}`}>
-              <div
-                className={`fuwari-cover-wrap h-full ${siteConfig('FUWARI_POST_LIST_COVER_HOVER_ENLARGE', true, CONFIG) ? 'fuwari-cover-enlarge' : ''}`}>
-                <img
-                  src={coverSrc}
-                  alt={post.title}
-                  className='w-full aspect-[2/1] max-h-52 md:aspect-auto md:max-h-none md:h-full md:min-h-[168px] object-cover rounded-2xl'
-                  onError={() => setCoverFailed(true)}
-                />
-              </div>
-            </SmartLink>
-          </div>
-        )}
-        {showRail && (
-          <SmartLink href={post.href || `/${post.slug}`} className='hidden md:flex fuwari-readmore-rail'>
-            <i className='fas fa-chevron-right' />
-          </SmartLink>
-        )}
       </div>
     </article>
   )

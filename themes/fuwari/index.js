@@ -43,6 +43,7 @@ const LayoutBase = props => {
   const searchModal = useRef(null)
   const router = useRouter()
   const showHomeHero =
+    siteConfig('FUWARI_HERO_ENABLE', false, CONFIG) &&
     !props.post &&
     (router.pathname === '/' || router.pathname === '/page/[page]')
 

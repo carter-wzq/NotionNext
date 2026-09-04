@@ -59,6 +59,29 @@ const Style = () => {
     #theme-fuwari .fuwari-cover-wrap img {
       transition: transform 0.35s ease;
     }
+    #theme-fuwari .fuwari-thumb-link {
+      display: block;
+      min-width: 0;
+    }
+    #theme-fuwari .fuwari-thumb-wrap {
+      overflow: hidden;
+      border-radius: 16px;
+      aspect-ratio: 1 / 1;
+      background: var(--fuwari-bg-soft);
+    }
+    #theme-fuwari .fuwari-thumb-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      display: block;
+      transition: transform 0.35s ease;
+    }
+    @media (max-width: 767px) {
+      #theme-fuwari .fuwari-post-card-grid--thumb {
+        grid-template-columns: 88px minmax(0, 1fr) !important;
+      }
+    }
     #theme-fuwari .fuwari-profile-card {
       padding: .95rem;
     }
@@ -504,19 +527,6 @@ const Style = () => {
       word-break: break-word;
       white-space: normal;
     }
-    #theme-fuwari .fuwari-readmore-rail {
-      width: 3.5rem;
-      min-width: 3.5rem;
-      border-radius: 1rem;
-      align-items: center;
-      justify-content: center;
-      border: 1px solid color-mix(in oklab, var(--fuwari-primary) 16%, var(--fuwari-border));
-      background: color-mix(in oklab, var(--fuwari-primary) 8%, var(--fuwari-surface));
-      color: var(--fuwari-primary);
-      font-size: 1.06rem;
-      transition: all .2s ease;
-      opacity: .95;
-    }
     #theme-fuwari .fuwari-pagination {
       --_page-size: 2.75rem;
     }
@@ -561,10 +571,6 @@ const Style = () => {
       justify-content: center;
       color: var(--fuwari-muted);
       font-size: .8rem;
-    }
-    #theme-fuwari #posts-wrapper article:hover .fuwari-readmore-rail {
-      background: color-mix(in oklab, var(--fuwari-primary) 10%, var(--fuwari-surface));
-      transform: translateX(1px);
     }
     #theme-fuwari #posts-wrapper {
       width: 100%;

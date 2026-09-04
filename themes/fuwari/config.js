@@ -23,9 +23,9 @@ const CONFIG = {
   // ---------------------------------------------------------------------------
   // 首页文章列表卡片
   // ---------------------------------------------------------------------------
-  /** 是否显示右侧封面图区域 */
+  /** 是否显示列表缩略图（正文第一张图，无图则不占位） */
   FUWARI_POST_LIST_COVER: true,
-  /** 无文章封面时，是否用站点横幅图（HOME_BANNER_IMAGE）作默认图 */
+  /** 无正文图时，是否用站点横幅图（HOME_BANNER_IMAGE）作默认图 */
   FUWARI_POST_LIST_COVER_DEFAULT: false,
   /** 封面悬停轻微放大 */
   FUWARI_POST_LIST_COVER_HOVER_ENLARGE: true,
@@ -33,8 +33,8 @@ const CONFIG = {
   FUWARI_POST_LIST_SUMMARY: true,
   /** 卡片内显示标签 */
   FUWARI_POST_LIST_TAG: true,
-  /** 桌面端列表卡片封面列宽度（px），增大则更扁长横向 */
-  FUWARI_POST_LIST_COVER_COL_WIDTH: 280,
+  /** 桌面端列表缩略图宽度（px） */
+  FUWARI_POST_LIST_COVER_COL_WIDTH: 148,
 
   // ---------------------------------------------------------------------------
   // 移动端
@@ -46,7 +46,7 @@ const CONFIG = {
   // 首页 Hero 大图区（封面来自站点信息或下方图片配置）
   // ---------------------------------------------------------------------------
   /** 是否渲染 Hero 区块（无图时仍占位，可按需关） */
-  FUWARI_HERO_ENABLE: true,
+  FUWARI_HERO_ENABLE: false,
   /** 自定义背景图 URL；留空则用 Notion 站点封面或 HOME_BANNER_IMAGE */
   FUWARI_HERO_BG_IMAGE: '',
   /** 右下角署名文案；留空不显示 */
