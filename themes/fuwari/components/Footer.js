@@ -26,7 +26,7 @@ const Footer = () => {
             <a
               href='https://github.com/tangly1024/NotionNext'
               target='_blank'
-              rel='noopener noreferrer'
+              rel='nofollow noopener noreferrer'
               className='fuwari-link font-semibold'>
               NotionNext{version ? ` v${version}` : ''}
             </a>{' '}

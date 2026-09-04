@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { siteConfig } from '@/lib/config'
+import { isFirstPartyHttpLink } from '@/components/NotionLink'
 
 // 过滤 <a> 标签不能识别的 props
 const filterDOMProps = props => {
@@ -62,7 +63,8 @@ const SmartLink = ({ href, children, ...rest }) => {
     urlString = safeHref.pathname
   }
 
-  const isExternal = urlString.startsWith('http') && !urlString.startsWith(LINK)
+  const isExternal =
+    urlString.startsWith('http') && !isFirstPartyHttpLink(urlString, LINK)
 
   const getPersistedQuery = () => {
     if (typeof window === 'undefined') return {}
@@ -116,7 +118,7 @@ const SmartLink = ({ href, children, ...rest }) => {
       <a
         href={externalUrl}
         target='_blank'
-        rel='noopener noreferrer'
+        rel='nofollow noopener noreferrer'
         {...filterDOMProps(rest)}>
         {children}
       </a>

@@ -10,7 +10,7 @@ describe('NotionLink', () => {
     const link = screen.getByRole('link', { name: 'Example' })
     expect(link).toHaveAttribute('href', 'https://example.com')
     expect(link).toHaveAttribute('target', '_blank')
-    expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer nofollow')
   })
 
   it('keeps same-origin absolute links in current tab', () => {
@@ -35,6 +35,23 @@ describe('NotionLink', () => {
     expect(link).toHaveAttribute('rel', expect.stringContaining('sponsored'))
     expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'))
     expect(link).toHaveAttribute('rel', expect.stringContaining('noreferrer'))
+  })
+
+  it('adds nofollow to third-party http links', () => {
+    render(<NotionLink href='https://brand24.com/pricing'>Brand24</NotionLink>)
+
+    const link = screen.getByRole('link', { name: 'Brand24' })
+    expect(link).toHaveAttribute('rel', expect.stringContaining('nofollow'))
+    expect(link).toHaveAttribute('target', '_blank')
+  })
+
+  it('does not nofollow first-party SignalMelo links', () => {
+    render(
+      <NotionLink href='https://www.signalmelo.com/'>Home</NotionLink>
+    )
+
+    const link = screen.getByRole('link', { name: 'Home' })
+    expect(link).not.toHaveAttribute('rel', expect.stringContaining('nofollow'))
   })
 
   it('keeps mailto links in current tab by default', () => {

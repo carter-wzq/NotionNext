@@ -3,6 +3,7 @@
  *
  *   node scripts/internal-links/apply-notion-links.mjs           # dry-run
  *   node scripts/internal-links/apply-notion-links.mjs --write   # patch Notion
+ *   node scripts/internal-links/apply-notion-links.mjs --audit   # leftover /product + duplicate internals
  *
  * Reads NOTION_API_KEY from .env.local. Does not print the secret.
  */
@@ -12,10 +13,12 @@ import {
   hrefFor,
   MAX_ARTICLE_LINKS,
   MAX_PRODUCT_LINKS,
-  LINKABLE_BLOCK_TYPES
+  LINKABLE_BLOCK_TYPES,
+  SITE
 } from './link-map.mjs'
 
 const WRITE = process.argv.includes('--write')
+const AUDIT = process.argv.includes('--audit')
 const DB_ID = '94a9b5e0-2328-839c-ab91-01f71f0ee990'
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 
@@ -150,6 +153,95 @@ function passthroughItem(item) {
   return cloneTextItem(item, content, existingLink)
 }
 
+function homeUrl() {
+  return SITE.replace(/\/$/, '')
+}
+
+function isProductPageUrl(url) {
+  if (!url || typeof url !== 'string') return false
+  try {
+    const u = new URL(url)
+    const host = u.hostname.replace(/^www\./, '')
+    if (host !== 'signalmelo.com') return false
+    return u.pathname.replace(/\/$/, '') === '/product'
+  } catch {
+    return false
+  }
+}
+
+function canonicalInternalUrl(url, currentSlug) {
+  if (!url || typeof url !== 'string') return null
+  try {
+    const u = new URL(url, 'https://blog.signalmelo.com')
+    const host = u.hostname.replace(/^www\./, '')
+    let path = u.pathname.replace(/\/$/, '') || '/'
+    if (host === 'signalmelo.com' && path === '/product') path = '/'
+    if (host === 'blog.signalmelo.com') {
+      const slug = path.replace(/^\/article\/?/, '')
+      if (!slug || slug === currentSlug) return null
+      return 'https://blog.signalmelo.com/article/' + slug
+    }
+    if (host === 'signalmelo.com') {
+      if (path === '/') return homeUrl()
+      return 'https://www.signalmelo.com' + path
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+function collectExistingTargets(blocks, currentSlug) {
+  const seen = new Set()
+  for (const block of blocks) {
+    if (!LINKABLE_BLOCK_TYPES.has(block.type)) continue
+    const richText = block[block.type]?.rich_text
+    if (!Array.isArray(richText)) continue
+    for (const t of richText) {
+      const href = t.text?.link?.url || t.href || null
+      const mapped = isProductPageUrl(href) ? homeUrl() : href
+      const key = canonicalInternalUrl(mapped, currentSlug)
+      if (key) seen.add(key)
+    }
+  }
+  return seen
+}
+
+function rewriteAndDedupe(richText, seen, currentSlug) {
+  if (!Array.isArray(richText)) return { next: richText, changed: 0 }
+  let changed = 0
+  const next = []
+  for (const t of richText) {
+    if (t.type && t.type !== 'text') {
+      next.push(passthroughItem(t))
+      continue
+    }
+    const content = t.plain_text || t.text?.content || ''
+    let href = t.text?.link?.url || t.href || null
+    if (isProductPageUrl(href)) {
+      href = homeUrl()
+      changed++
+    }
+    const key = canonicalInternalUrl(href, currentSlug)
+    if (key) {
+      if (seen.has(key)) {
+        href = null
+        changed++
+      } else {
+        seen.add(key)
+      }
+    }
+    next.push(cloneTextItem(t, content, href))
+  }
+  return {
+    next: next.filter(t => {
+      if (t.type === 'mention' || t.type === 'equation') return true
+      return (t.text?.content || '').length > 0
+    }),
+    changed
+  }
+}
+
 function applyLink(richText, start, length, url) {
   const end = start + length
   const next = []
@@ -243,6 +335,7 @@ async function listPublishedPosts() {
 }
 
 function pickLinksForPage(slug, blocks) {
+  const existing = collectExistingTargets(blocks, slug)
   const articleUsed = new Set()
   const productUsed = new Set()
   const plans = []
@@ -263,13 +356,14 @@ function pickLinksForPage(slug, blocks) {
 
     for (const entry of candidates) {
       const url = hrefFor(entry)
-      const isProduct = !!entry.product || (entry.url && entry.url.startsWith('https://www.signalmelo.com'))
+      const key = canonicalInternalUrl(url, slug) || url
+      if (existing.has(key) || articleUsed.has(key) || productUsed.has(key)) continue
+
+      const isProduct = !!entry.product || (entry.url && /signalmelo\.com/.test(entry.url) && !/blog\.signalmelo\.com/.test(entry.url))
       if (isProduct) {
         if (productUsed.size >= MAX_PRODUCT_LINKS) continue
-        if (productUsed.has(url)) continue
       } else {
         if (articleUsed.size >= MAX_ARTICLE_LINKS) continue
-        if (articleUsed.has(url)) continue
       }
 
       const hit = findPhraseIndex(plain, entry.phrase, !!entry.caseSensitive)
@@ -301,28 +395,62 @@ function pickLinksForPage(slug, blocks) {
         length: hit.length,
         snippet: plain.slice(Math.max(0, hit.index - 40), hit.index + hit.length + 40).replace(/\s+/g, ' ')
       })
-      if (isProduct) productUsed.add(url)
-      else articleUsed.add(url)
+      if (isProduct) productUsed.add(key)
+      else articleUsed.add(key)
     }
   }
 
   return plans
 }
 
-async function patchBlock(block, planGroup) {
+function collectHrefItems(block) {
+  const items = []
   const data = block[block.type]
-  let richText = data.rich_text
-  const sorted = [...planGroup].sort((a, b) => b.start - a.start)
-  for (const plan of sorted) {
-    richText = applyLink(richText, plan.start, plan.length, plan.url)
+  if (!data) return items
+  const pushRich = (rt, field) => {
+    if (!Array.isArray(rt)) return
+    for (const t of rt) {
+      const href = t.text?.link?.url || t.href || null
+      if (!href) continue
+      items.push({
+        href,
+        text: (t.plain_text || t.text?.content || '').slice(0, 60),
+        type: block.type,
+        field
+      })
+    }
   }
-  await notion('PATCH', `/blocks/${block.id}`, {
-    [block.type]: { rich_text: richText }
-  })
+  pushRich(data.rich_text, 'rich_text')
+  pushRich(data.title, 'title')
+  pushRich(data.caption, 'caption')
+  if (typeof data.url === 'string' && data.url) {
+    items.push({ href: data.url, text: '', type: block.type, field: 'url' })
+  }
+  return items
+}
+
+function auditPage(slug, blocks) {
+  const productHits = []
+  const byKey = new Map()
+  for (const block of blocks) {
+    for (const item of collectHrefItems(block)) {
+      if (isProductPageUrl(item.href) || /signalmelo\.com\/product(\/|$|\?|#)/i.test(item.href)) {
+        productHits.push({ ...item, slug })
+      }
+      const key = canonicalInternalUrl(item.href, slug)
+      if (!key) continue
+      if (!byKey.has(key)) byKey.set(key, [])
+      byKey.get(key).push(item)
+    }
+  }
+  const dupes = [...byKey.entries()]
+    .filter(([, arr]) => arr.length > 1)
+    .map(([url, arr]) => ({ url, count: arr.length, texts: arr.map(a => a.text) }))
+  return { productHits, dupes }
 }
 
 async function main() {
-  console.log(WRITE ? 'MODE write' : 'MODE dry-run')
+  console.log(AUDIT ? 'MODE audit' : WRITE ? 'MODE write' : 'MODE dry-run')
   try {
     await notion('GET', `/databases/${DB_ID}`)
     console.log('probe: database OK')
@@ -337,6 +465,32 @@ async function main() {
   const posts = await listPublishedPosts()
   console.log('published posts:', posts.length)
 
+  if (AUDIT) {
+    let leftoverProduct = 0
+    let dupePages = 0
+    for (const post of posts) {
+      await sleep(200)
+      const blocks = await walkBlocks(post.id)
+      const { productHits, dupes } = auditPage(post.slug, blocks)
+      if (productHits.length || dupes.length) {
+        console.log(`\n== ${post.slug}`)
+        for (const hit of productHits) {
+          leftoverProduct++
+          console.log(`  [product] ${hit.type} ${hit.href} "${hit.text}"`)
+        }
+        if (dupes.length) dupePages++
+        for (const d of dupes) {
+          console.log(`  [dup x${d.count}] ${d.url}`)
+          for (const t of d.texts) console.log(`     - "${t}"`)
+        }
+      }
+    }
+    console.log('\n----')
+    console.log('leftover /product links:', leftoverProduct)
+    console.log('pages with duplicate internal destinations:', dupePages)
+    return
+  }
+
   const summary = []
   let patched = 0
 
@@ -346,34 +500,66 @@ async function main() {
     const plans = pickLinksForPage(post.slug, blocks)
     summary.push({ slug: post.slug, title: post.title, count: plans.length, plans })
 
-    console.log(`\n== ${post.slug} (${plans.length})`)
-    for (const p of plans) {
-      console.log(`  [${p.isProduct ? 'product' : 'article'}] "${p.matched}" -> ${p.url}`)
-      console.log(`     …${p.snippet}…`)
-    }
-
-    if (!WRITE || !plans.length) continue
-
     const byBlock = new Map()
     for (const p of plans) {
       if (!byBlock.has(p.blockId)) byBlock.set(p.blockId, [])
       byBlock.get(p.blockId).push(p)
     }
-    const blockMap = Object.fromEntries(blocks.map(b => [b.id, b]))
-    for (const [blockId, group] of byBlock) {
+
+    const seen = new Set()
+    const updates = []
+    for (const block of blocks) {
+      if (!LINKABLE_BLOCK_TYPES.has(block.type)) continue
+      let richText = block[block.type]?.rich_text
+      if (!Array.isArray(richText)) continue
+      const group = byBlock.get(block.id) || []
+      if (group.length) {
+        const sorted = [...group].sort((a, b) => b.start - a.start)
+        for (const plan of sorted) {
+          richText = applyLink(richText, plan.start, plan.length, plan.url)
+        }
+      }
+      const { next, changed } = rewriteAndDedupe(richText, seen, post.slug)
+      if (changed || group.length) {
+        updates.push({ block, next, newLinks: group.length, deduped: changed })
+      }
+    }
+
+    console.log(`\n== ${post.slug} (new ${plans.length}, blocks to patch ${updates.length})`)
+    for (const p of plans) {
+      console.log(`  [${p.isProduct ? 'site' : 'article'}] "${p.matched}" -> ${p.url}`)
+      console.log(`     …${p.snippet}…`)
+    }
+    for (const u of updates) {
+      if (u.deduped && !u.newLinks) {
+        console.log(`  [dedupe/rewrite] ${u.block.id.slice(0, 8)}`)
+      }
+    }
+
+    if (!WRITE || !updates.length) continue
+
+    for (const u of updates) {
       await sleep(350)
       try {
-        await patchBlock(blockMap[blockId], group)
+        await notion('PATCH', `/blocks/${u.block.id}`, {
+          [u.block.type]: { rich_text: u.next }
+        })
         patched++
       } catch (e) {
-        console.error(`  PATCH fail ${post.slug} ${blockId}: ${e.message}`)
+        console.error(`  PATCH fail ${post.slug} ${u.block.id}: ${e.message}`)
       }
     }
   }
 
   const totalLinks = summary.reduce((n, s) => n + s.count, 0)
   console.log('\n----')
-  console.log('pages', summary.length, 'links planned', totalLinks, WRITE ? `blocks patched ${patched}` : '(dry-run, nothing written)')
+  console.log(
+    'pages',
+    summary.length,
+    'links planned',
+    totalLinks,
+    WRITE ? `blocks patched ${patched}` : '(dry-run, nothing written)'
+  )
 }
 
 main().catch(e => {

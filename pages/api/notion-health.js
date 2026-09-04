@@ -6,9 +6,44 @@ import { normalizeNotionMetadata } from '@/lib/db/notion/normalizeUtil'
 import { delCacheByPrefix, delCacheData } from '@/lib/cache/cache_manager'
 import { idToUuid } from 'notion-utils'
 
+function toSitePath(href) {
+  if (!href || typeof href !== 'string' || /^https?:/i.test(href)) return null
+  const path = (href.startsWith('/') ? href : `/${href}`).split('?')[0]
+  if (!path.startsWith('/') || path.length > 300) return null
+  return path.replace(/\/+$/, '') || '/'
+}
+
+function collectArticlePaths(siteData, extraPath) {
+  const paths = new Set(['/', '/archive'])
+  const extra = toSitePath(extraPath)
+  if (extra) paths.add(extra)
+  for (const page of siteData?.allPages || []) {
+    if (!/post/i.test(String(page?.type || ''))) continue
+    if (!/publish/i.test(String(page?.status || ''))) continue
+    const path = toSitePath(page.href || page.slug)
+    if (path) paths.add(path)
+  }
+  return [...paths]
+}
+
+async function revalidatePaths(res, paths) {
+  const out = {}
+  for (const path of paths) {
+    try {
+      await res.revalidate(path)
+      out[path] = 'ok'
+    } catch (e) {
+      out[path] = String(e?.message || e)
+    }
+  }
+  return out
+}
+
 /**
  * 临时诊断：检查 Vercel 上能否拉到 Notion，以及站点数据转换是否成功。
  * GET /api/notion-health?key=<NOTION_PAGE_ID 后 6 位>
+ * GET /api/notion-health?key=...&flush=1  清 Redis 并重验证全部文章 ISR
+ * GET /api/notion-health?key=...&path=/article/slug  重验证单篇
  */
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -34,8 +69,13 @@ export default async function handler(req, res) {
     steps: {}
   }
 
+  const wantFlush = String(req.query?.flush || '') === '1'
+  const extraPath = String(
+    Array.isArray(req.query?.path) ? req.query.path[0] : req.query?.path || ''
+  )
+
   // 清 Redis：站点索引 + 全部文章 block（旧缓存没有缩略图/新内链）
-  if (String(req.query?.flush || '') === '1') {
+  if (wantFlush) {
     const keys = [`site_${pageId}`, `page_block_${pageId}`]
     for (const cacheKey of keys) {
       try {
@@ -52,23 +92,6 @@ export default async function handler(req, res) {
       )
     } catch (e) {
       result.steps.flush_prefix = String(e?.message || e)
-    }
-    const revalidatePaths = [
-      '/',
-      '/archive',
-      '/article/what-is-social-listening',
-      '/article/reddit-marketing-for-saas',
-      '/article/8-best-brand24-alternatives-in-2026',
-      '/article/how-to-find-subreddits-for-saas'
-    ]
-    result.steps.revalidate = {}
-    for (const path of revalidatePaths) {
-      try {
-        await res.revalidate(path)
-        result.steps.revalidate[path] = 'ok'
-      } catch (e) {
-        result.steps.revalidate[path] = String(e?.message || e)
-      }
     }
   }
 
@@ -108,11 +131,13 @@ export default async function handler(req, res) {
   }
 
   // 3) 完整站点数据管道
+  let siteData = null
   try {
     const start = Date.now()
-    const siteData = await fetchGlobalAllData({
+    siteData = await fetchGlobalAllData({
       pageId,
-      from: 'notion-health'
+      from: 'notion-health',
+      skipBatchFetch: true
     })
     const first = siteData?.allPages?.[0]
     result.steps.fetchGlobalAllData = {
@@ -131,6 +156,16 @@ export default async function handler(req, res) {
     result.steps.fetchGlobalAllData = {
       error: String(e?.message || e),
       stack: String(e?.stack || '').split('\n').slice(0, 6)
+    }
+  }
+
+  if (wantFlush || extraPath) {
+    const paths = wantFlush
+      ? collectArticlePaths(siteData, extraPath)
+      : [toSitePath(extraPath)].filter(Boolean)
+    if (paths.length) {
+      result.steps.revalidate = await revalidatePaths(res, paths)
+      result.steps.revalidateCount = paths.length
     }
   }
 

@@ -1,3 +1,4 @@
+import { isFirstPartyHttpLink } from '@/components/NotionLink'
 import { siteConfig } from '@/lib/config'
 import { handleEmailClick } from '@/lib/plugins/mailEncrypt'
 import { useRef } from 'react'
@@ -49,7 +50,13 @@ const SocialButton = () => {
                 : undefined
             }
             target={item.isMail ? undefined : '_blank'}
-            rel={item.isMail ? undefined : 'noopener noreferrer'}
+            rel={
+              item.isMail
+                ? undefined
+                : isFirstPartyHttpLink(item.href)
+                  ? 'noopener noreferrer'
+                  : 'nofollow noopener noreferrer'
+            }
             aria-label={item.label}
             ref={item.isMail ? emailIcon : undefined}
             className='fuwari-social-btn'>

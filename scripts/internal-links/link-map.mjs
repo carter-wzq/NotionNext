@@ -57,7 +57,7 @@ export const PHRASE_CATALOG = [
   { phrase: 'social listening for Reddit', url: SITE + '/social-listening/reddit', product: true },
   { phrase: 'X monitoring', url: SITE + '/social-listening/x', product: true },
   { phrase: 'signalmelo.com', url: SITE, product: true },
-  { phrase: 'SignalMelo', url: SITE + '/product', product: true, caseSensitive: true }
+  { phrase: 'SignalMelo', url: SITE, product: true, caseSensitive: true }
 ]
 
 export function hrefFor(entry) {
