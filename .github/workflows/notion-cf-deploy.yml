@@ -3,13 +3,12 @@
 #   CLOUDFLARE_DEPLOY_HOOK  - Pages Deploy Hook URL (POST)
 #   NOTION_PAGE_ID          - same as site config
 # Optional:
-#   API_BASE_URL            - default https://eminent-fountain-944.notion.site/api/v3
+#   API_BASE_URL            - prefer your notion.site /api/v3
 
 name: Notion change → Cloudflare deploy
 
 on:
   schedule:
-    # Check every 20 minutes; only deploy when fingerprint changes
     - cron: '*/20 * * * *'
   workflow_dispatch:
 
@@ -37,26 +36,68 @@ jobs:
           CLOUDFLARE_DEPLOY_HOOK: ${{ secrets.CLOUDFLARE_DEPLOY_HOOK }}
         run: |
           set -euo pipefail
+
           if [ -z "${NOTION_PAGE_ID:-}" ]; then
-            echo "NOTION_PAGE_ID secret is required"
+            echo "::error::GitHub Secret NOTION_PAGE_ID is missing. Add it under Settings → Secrets and variables → Actions."
             exit 1
           fi
 
           PAGE_ID="${NOTION_PAGE_ID%%,*}"
           PAGE_ID="${PAGE_ID#*:}"
-          BASE="${API_BASE_URL:-https://eminent-fountain-944.notion.site/api/v3}"
-          BASE="${BASE%/}"
+          PAGE_ID="$(echo "$PAGE_ID" | tr -d '[:space:]')"
           UUID=$(echo "$PAGE_ID" | sed -E 's/^(.{8})(.{4})(.{4})(.{4})(.{12})$/\1-\2-\3-\4-\5/')
           BODY=$(jq -nc --arg id "$UUID" '{pageId:$id,limit:30,cursor:{stack:[]},chunkNumber:0,verticalColumns:false}')
-          RESP=$(curl -fsS -X POST "$BASE/loadPageChunk" \
-            -H 'content-type: application/json' \
-            -d "$BODY")
+
+          echo "page_id=$PAGE_ID"
+          echo "uuid=$UUID"
+
+          # Prefer secret, then known-good notion.site, then notion.so
+          CANDIDATES=()
+          if [ -n "${API_BASE_URL:-}" ]; then
+            CANDIDATES+=("${API_BASE_URL%/}")
+          fi
+          CANDIDATES+=(
+            "https://eminent-fountain-944.notion.site/api/v3"
+            "https://www.notion.so/api/v3"
+          )
+
+          RESP=""
+          USED_BASE=""
+          for BASE in "${CANDIDATES[@]}"; do
+            echo "Trying Notion API: $BASE/loadPageChunk"
+            HTTP_CODE=$(curl -sS -o /tmp/notion-resp.json -w "%{http_code}" -X POST "$BASE/loadPageChunk" \
+              -H 'content-type: application/json' \
+              -H 'user-agent: NotionNext-CF-Deploy/1.0' \
+              -d "$BODY" || true)
+            echo "HTTP $HTTP_CODE"
+            if [ "$HTTP_CODE" = "200" ]; then
+              RESP=$(cat /tmp/notion-resp.json)
+              USED_BASE="$BASE"
+              break
+            fi
+            echo "Body preview:"
+            head -c 300 /tmp/notion-resp.json || true
+            echo
+          done
+
+          if [ -z "$RESP" ]; then
+            echo "::error::All Notion API endpoints failed. Check NOTION_PAGE_ID / API_BASE_URL secrets, and that the Notion page is shared to web."
+            exit 1
+          fi
+          echo "Using API base: $USED_BASE"
 
           NEW_FP=$(echo "$RESP" | jq -r --arg id "$UUID" '
             (.recordMap.block[$id].value.value.version // .recordMap.block[$id].value.version // 0|tostring)
             + "|" +
             ((.recordMap.collection // {}) | to_entries | map(.value.value.last_edited_time // .value.last_edited_time // "") | max // "")
           ')
+
+          if [ -z "$NEW_FP" ] || [ "$NEW_FP" = "null" ]; then
+            echo "::error::Could not compute fingerprint. Response preview:"
+            echo "$RESP" | head -c 500
+            exit 1
+          fi
+
           OLD=""
           if [ -f .notion-deploy-fingerprint ]; then
             OLD=$(cat .notion-deploy-fingerprint)
@@ -72,11 +113,20 @@ jobs:
           echo "$NEW_FP" > .notion-deploy-fingerprint
 
           if [ -z "${CLOUDFLARE_DEPLOY_HOOK:-}" ]; then
-            echo "CLOUDFLARE_DEPLOY_HOOK missing; fingerprint updated only."
+            echo "::warning::CLOUDFLARE_DEPLOY_HOOK secret missing. Fingerprint saved, but no deploy was triggered."
+            echo "Add Deploy Hook URL as GitHub Secret CLOUDFLARE_DEPLOY_HOOK, then re-run."
             exit 0
           fi
 
           echo "Change detected; posting Deploy Hook..."
-          curl -fsS -X POST "$CLOUDFLARE_DEPLOY_HOOK"
+          HOOK_CODE=$(curl -sS -o /tmp/hook-resp.txt -w "%{http_code}" -X POST "$CLOUDFLARE_DEPLOY_HOOK" || true)
+          echo "Deploy Hook HTTP $HOOK_CODE"
+          cat /tmp/hook-resp.txt || true
           echo
-          echo "Deploy Hook triggered."
+          case "$HOOK_CODE" in
+            200|201|202|204) echo "Deploy Hook triggered." ;;
+            *)
+              echo "::error::Deploy Hook failed (HTTP $HOOK_CODE). Recreate the hook in Cloudflare Pages → Settings → Deploy hooks, then update the GitHub secret."
+              exit 1
+              ;;
+          esac
