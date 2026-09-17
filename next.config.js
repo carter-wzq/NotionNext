@@ -183,6 +183,8 @@ const nextConfig = {
       locales: locales
     },
   images: {
+    // 静态导出无 Image Optimization 服务
+    unoptimized: isExport(),
     // 图片压缩和格式优化
     formats: ['image/avif', 'image/webp'],
     // 图片尺寸优化 — 精简尺寸减少Vercel图片处理变体数量（8+8→4+4，变体数减半）

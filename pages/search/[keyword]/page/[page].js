@@ -2,6 +2,7 @@ import BLOG from '@/blog.config'
 import { getDataFromCache, setDataToCache } from '@/lib/cache/cache_manager'
 import { siteConfig } from '@/lib/config'
 import { fetchGlobalAllData } from '@/lib/db/SiteDataApi'
+import { isExport } from '@/lib/utils/buildMode'
 import { DynamicLayout } from '@/themes/theme'
 
 const Index = props => {
@@ -49,7 +50,7 @@ export async function getStaticProps({ params: { keyword, page }, locale }) {
 export function getStaticPaths() {
   return {
     paths: [{ params: { keyword: 'NotionNext', page: '1' } }],
-    fallback: true
+    fallback: isExport() ? false : true
   }
 }
 

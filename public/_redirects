@@ -1,0 +1,5 @@
+# Cloudflare Pages redirects
+# Legacy Next.js i18n prefix (Vercel ISR era)
+/en-US / 301
+/en-US/ / 301
+/en-US/* /:splat 301

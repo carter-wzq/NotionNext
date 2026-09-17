@@ -1,6 +1,7 @@
 import BLOG from '@/blog.config'
 import { siteConfig } from '@/lib/config'
 import { fetchGlobalAllData } from '@/lib/db/SiteDataApi'
+import { isExport } from '@/lib/utils/buildMode'
 import { DynamicLayout } from '@/themes/theme'
 
 /**
@@ -76,6 +77,6 @@ export async function getStaticPaths() {
 
   return {
     paths,
-    fallback: true
+    fallback: isExport() ? false : true
   }
 }

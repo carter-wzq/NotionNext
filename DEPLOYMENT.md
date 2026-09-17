@@ -310,6 +310,62 @@ docker-compose up -d
 yarn export
 ```
 
+产物目录为 `out/`。`public/_redirects` 会一并打进产物（含 `/en-US/*` → 无前缀的 301）。
+
+### Cloudflare Pages（推荐静态博客路径）
+
+适合纯静态博客：无 ISR / API / Redis 运行时；Notion 更新靠重新构建。
+
+#### 1. 创建 Pages 项目
+
+1. 打开 [Cloudflare Pages](https://pages.cloudflare.com/) → Create → 连接 GitHub 仓库 `NotionNext`
+2. 构建设置：
+   - **Framework preset**: None（或 Next.js Static HTML Export）
+   - **Build command**: `yarn export`
+   - **Build output directory**: `out`
+   - **Node version**: `20`（与 `.nvmrc` 一致，可在 Environment variables 设 `NODE_VERSION=20`）
+3. Environment variables（Production）：
+
+| 变量 | 示例 |
+|------|------|
+| `EXPORT` | `true` |
+| `NOTION_PAGE_ID` | `94a9b5e0...`（你的库 ID） |
+| `API_BASE_URL` | `https://eminent-fountain-944.notion.site/api/v3` |
+| `NEXT_PUBLIC_THEME` | `fuwari`（可选） |
+| `NEXT_PUBLIC_LINK` | `https://blog.signalmelo.com` |
+
+构建期**不必**配置 `REDIS_URL` / `ENABLE_CACHE`。
+
+4. 用分配的 `*.pages.dev` 预览首页、文章、分类是否正常。
+
+#### 2. 绑定域名
+
+自定义域名只绑 **`blog.signalmelo.com`**（本仓库当前切流范围）。DNS 切到 Cloudflare 后，观察几天再停 Vercel 生产部署。
+
+#### 3. Notion 发文后自动部署（无需 Make/Zapier）
+
+1. Pages → Settings → **Deploy hooks** → 创建 Hook，复制 URL  
+2. GitHub 仓库 → Settings → Secrets → Actions，添加：
+   - `CLOUDFLARE_DEPLOY_HOOK` = Hook URL  
+   - `NOTION_PAGE_ID` = 同上  
+   - `API_BASE_URL` =（可选）notion.site API  
+3. 仓库已含工作流 [`.github/workflows/notion-cf-deploy.yml`](.github/workflows/notion-cf-deploy.yml)：  
+   - 每 20 分钟检查 Notion 页面指纹  
+   - **有变更才** `POST` Deploy Hook；无变更跳过  
+   - 也可在 Actions 里手动 **Run workflow**  
+4. 若 Notion 套餐支持数据库 Automation「发送 webhook」，也可在 `status=Published` 时直接 POST 同一 Hook（可与 GHA 并存）。
+
+小编流程：写完 → `status` 设为 **Published** → 最多约 20 分钟内（或 Automation 即时）触发构建 → 构建完成后面板更新。
+
+#### 4. 与 Vercel ISR 的差异
+
+| | Vercel ISR | CF Pages 静态 |
+|--|------------|---------------|
+| 运行时 CPU | 有 | 无（静态 CDN） |
+| 内容更新 | revalidate | 重新构建 |
+| API / Clerk | 可用 | 不可用 |
+| `/en-US` 旧链 | i18n 前缀 | `_redirects` 301 去掉前缀 |
+
 ### GitHub Pages 部署
 
 1. **GitHub Actions 配置**

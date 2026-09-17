@@ -1,0 +1,82 @@
+# Detect Notion content changes and trigger Cloudflare Pages Deploy Hook.
+# Secrets:
+#   CLOUDFLARE_DEPLOY_HOOK  - Pages Deploy Hook URL (POST)
+#   NOTION_PAGE_ID          - same as site config
+# Optional:
+#   API_BASE_URL            - default https://eminent-fountain-944.notion.site/api/v3
+
+name: Notion change → Cloudflare deploy
+
+on:
+  schedule:
+    # Check every 20 minutes; only deploy when fingerprint changes
+    - cron: '*/20 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: notion-cf-deploy
+  cancel-in-progress: false
+
+jobs:
+  check-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Restore previous fingerprint
+        uses: actions/cache@v4
+        with:
+          path: .notion-deploy-fingerprint
+          key: notion-fp-${{ github.run_id }}
+          restore-keys: |
+            notion-fp-
+
+      - name: Fetch Notion fingerprint and maybe deploy
+        env:
+          NOTION_PAGE_ID: ${{ secrets.NOTION_PAGE_ID }}
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+          CLOUDFLARE_DEPLOY_HOOK: ${{ secrets.CLOUDFLARE_DEPLOY_HOOK }}
+        run: |
+          set -euo pipefail
+          if [ -z "${NOTION_PAGE_ID:-}" ]; then
+            echo "NOTION_PAGE_ID secret is required"
+            exit 1
+          fi
+
+          PAGE_ID="${NOTION_PAGE_ID%%,*}"
+          PAGE_ID="${PAGE_ID#*:}"
+          BASE="${API_BASE_URL:-https://eminent-fountain-944.notion.site/api/v3}"
+          BASE="${BASE%/}"
+          UUID=$(echo "$PAGE_ID" | sed -E 's/^(.{8})(.{4})(.{4})(.{4})(.{12})$/\1-\2-\3-\4-\5/')
+          BODY=$(jq -nc --arg id "$UUID" '{pageId:$id,limit:30,cursor:{stack:[]},chunkNumber:0,verticalColumns:false}')
+          RESP=$(curl -fsS -X POST "$BASE/loadPageChunk" \
+            -H 'content-type: application/json' \
+            -d "$BODY")
+
+          NEW_FP=$(echo "$RESP" | jq -r --arg id "$UUID" '
+            (.recordMap.block[$id].value.value.version // .recordMap.block[$id].value.version // 0|tostring)
+            + "|" +
+            ((.recordMap.collection // {}) | to_entries | map(.value.value.last_edited_time // .value.last_edited_time // "") | max // "")
+          ')
+          OLD=""
+          if [ -f .notion-deploy-fingerprint ]; then
+            OLD=$(cat .notion-deploy-fingerprint)
+          fi
+          echo "old=$OLD"
+          echo "new=$NEW_FP"
+
+          if [ "$OLD" = "$NEW_FP" ] && [ -n "$OLD" ]; then
+            echo "No Notion change; skip deploy."
+            exit 0
+          fi
+
+          echo "$NEW_FP" > .notion-deploy-fingerprint
+
+          if [ -z "${CLOUDFLARE_DEPLOY_HOOK:-}" ]; then
+            echo "CLOUDFLARE_DEPLOY_HOOK missing; fingerprint updated only."
+            exit 0
+          fi
+
+          echo "Change detected; posting Deploy Hook..."
+          curl -fsS -X POST "$CLOUDFLARE_DEPLOY_HOOK"
+          echo
+          echo "Deploy Hook triggered."

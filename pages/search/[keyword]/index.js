@@ -2,6 +2,7 @@ import BLOG from '@/blog.config'
 import { getDataFromCache, setDataToCache } from '@/lib/cache/cache_manager'
 import { siteConfig } from '@/lib/config'
 import { fetchGlobalAllData } from '@/lib/db/SiteDataApi'
+import { isExport } from '@/lib/utils/buildMode'
 import { DynamicLayout } from '@/themes/theme'
 import { getPageContentText } from '@/lib/db/notion/getPageContentText'
 
@@ -51,7 +52,7 @@ export async function getStaticProps({ params: { keyword }, locale }) {
 export function getStaticPaths() {
   return {
     paths: [{ params: { keyword: 'NotionNext' } }],
-    fallback: true
+    fallback: isExport() ? false : true
   }
 }
 
