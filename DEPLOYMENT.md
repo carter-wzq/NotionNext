@@ -344,18 +344,33 @@ yarn export
 
 #### 3. Notion 发文后自动部署（无需 Make/Zapier）
 
-1. Pages → Settings → **Deploy hooks** → 创建 Hook，复制 URL  
-2. GitHub 仓库 → Settings → Secrets → Actions，添加：
-   - `CLOUDFLARE_DEPLOY_HOOK` = Hook URL  
-   - `NOTION_PAGE_ID` = 同上  
-   - `API_BASE_URL` =（可选）notion.site API  
-3. 仓库已含工作流 [`.github/workflows/notion-cf-deploy.yml`](.github/workflows/notion-cf-deploy.yml)：  
-   - 每 20 分钟检查 Notion 页面指纹  
-   - **有变更才** `POST` Deploy Hook；无变更跳过  
-   - 也可在 Actions 里手动 **Run workflow**  
-4. 若 Notion 套餐支持数据库 Automation「发送 webhook」，也可在 `status=Published` 时直接 POST 同一 Hook（可与 GHA 并存）。
+GitHub Actions 的服务器 IP **经常无法访问** Notion 非官方网页 API，因此推荐下面两种方式之一。
 
-小编流程：写完 → `status` 设为 **Published** → 最多约 20 分钟内（或 Automation 即时）触发构建 → 构建完成后面板更新。
+##### 方式 A：手动一键部署（立刻可用）
+
+1. Cloudflare Pages → **Settings** → **Deploy hooks** → 创建 Hook，复制 URL  
+2. GitHub → **Settings** → **Secrets and variables** → **Actions**，添加：  
+   - `CLOUDFLARE_DEPLOY_HOOK` = Hook URL  
+3. **Actions** → **Notion change → Cloudflare deploy** → **Run workflow**  
+   - 勾选 **force_deploy**（默认已勾选）→ 会直接触发 Cloudflare 构建  
+
+小编发完文后，你（或小编）点一次 Run workflow 即可。
+
+##### 方式 B：自动检测变更（推荐配置 Integration）
+
+1. 打开 [Notion → My integrations](https://www.notion.so/my-integrations) → **New integration**  
+2. 名称随意（如 `SignalMelo Deploy`）→ 提交后复制 **Internal Integration Secret**（`secret_` / `ntn_` 开头）  
+3. 回到博客 Notion 数据库页面 → 右上角 **···** → **Connections** / **连接** → 勾选刚建的 Integration（必须！）  
+4. GitHub Secrets 再增加：  
+   - `NOTION_INTEGRATION_TOKEN` = 刚才的 Secret  
+   - `NOTION_PAGE_ID` = 数据库页面 ID（32 位，与站点配置相同）  
+5. 工作流每 20 分钟用**官方 API**读 `last_edited_time`，有变化才 POST Deploy Hook  
+
+若未配置 Integration：定时任务在 Notion 不可达时会**跳过**（不再红字失败）；手动 Run 仍会强制部署。
+
+##### 可选：Notion Automation 直接打 Hook
+
+若套餐支持数据库 Automation「发送 webhook」：在 `status=Published` 时 POST 同一个 Deploy Hook，可与上面并存。
 
 #### 4. 与 Vercel ISR 的差异
 
