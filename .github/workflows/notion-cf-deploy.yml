@@ -58,23 +58,46 @@ jobs:
 
             NEW_FP=""
 
-            # 1) Official Notion API (works from GitHub Actions when integration is shared)
-            if [ -n "${NOTION_INTEGRATION_TOKEN:-}" ] && [ -n "$PAGE_ID" ]; then
-              echo "Trying official Notion API..."
-              HTTP_CODE=$(curl -sS -o /tmp/notion-official.json -w "%{http_code}" \
+            # 1) Official Notion API — fingerprint recent page edits (parent page
+            # last_edited_time often does NOT change when a DB row is added).
+            if [ -n "${NOTION_INTEGRATION_TOKEN:-}" ]; then
+              echo "Trying official Notion search API for recent edits..."
+              HTTP_CODE=$(curl -sS -o /tmp/notion-search.json -w "%{http_code}" \
+                -X POST "https://api.notion.com/v1/search" \
                 -H "Authorization: Bearer ${NOTION_INTEGRATION_TOKEN}" \
                 -H "Notion-Version: 2022-06-28" \
-                "https://api.notion.com/v1/pages/${PAGE_ID}" || true)
-              echo "Official API HTTP $HTTP_CODE"
+                -H "content-type: application/json" \
+                -d '{"page_size":20,"sort":{"direction":"descending","timestamp":"last_edited_time"},"filter":{"property":"object","value":"page"}}' || true)
+              echo "Official search HTTP $HTTP_CODE"
               if [ "$HTTP_CODE" = "200" ]; then
-                NEW_FP=$(jq -r '"official|" + (.last_edited_time // .id // "unknown")' /tmp/notion-official.json)
+                NEW_FP=$(jq -r '
+                  [.results[]? | ((.id // "") + "|" + (.last_edited_time // ""))]
+                  | join(",")
+                  | if . == "" then empty else "search|" + . end
+                ' /tmp/notion-search.json)
               else
-                echo "Official API body:"
-                head -c 400 /tmp/notion-official.json || true
+                echo "Official search body:"
+                head -c 400 /tmp/notion-search.json || true
                 echo
               fi
+
+              # Fallback: single page/database last_edited_time
+              if [ -z "$NEW_FP" ] && [ -n "$PAGE_ID" ]; then
+                for PATH_KIND in pages databases; do
+                  echo "Trying official GET /$PATH_KIND/$PAGE_ID ..."
+                  HTTP_CODE=$(curl -sS -o /tmp/notion-official.json -w "%{http_code}" \
+                    -H "Authorization: Bearer ${NOTION_INTEGRATION_TOKEN}" \
+                    -H "Notion-Version: 2022-06-28" \
+                    "https://api.notion.com/v1/${PATH_KIND}/${PAGE_ID}" || true)
+                  echo "Official $PATH_KIND HTTP $HTTP_CODE"
+                  if [ "$HTTP_CODE" = "200" ]; then
+                    NEW_FP=$(jq -r '"official|" + (.object // "obj") + "|" + (.last_edited_time // .id // "unknown")' /tmp/notion-official.json)
+                    break
+                  fi
+                done
+              fi
             else
-              echo "Skip official API (need secrets NOTION_INTEGRATION_TOKEN + NOTION_PAGE_ID)."
+              echo "Skip official API (need secret NOTION_INTEGRATION_TOKEN)."
             fi
 
             # 2) Unofficial loadPageChunk fallback (often blocked on GitHub runners)
