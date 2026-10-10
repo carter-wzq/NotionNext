@@ -173,14 +173,26 @@ jobs:
           fi
 
           echo "Posting Deploy Hook..."
-          HOOK_CODE=$(curl -sS -o /tmp/hook-resp.txt -w "%{http_code}" -X POST "$CLOUDFLARE_DEPLOY_HOOK" || true)
+          # Avoid conditional GET/304 caching quirks; force a real POST
+          HOOK_CODE=$(curl -sS -o /tmp/hook-resp.txt -w "%{http_code}" \
+            -X POST "$CLOUDFLARE_DEPLOY_HOOK" \
+            -H 'Cache-Control: no-cache' \
+            -H 'Content-Type: application/json' \
+            -d "{\"source\":\"github-actions\",\"reason\":\"${reason}\",\"ts\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" \
+            || true)
           echo "Deploy Hook HTTP $HOOK_CODE"
           cat /tmp/hook-resp.txt || true
           echo
           case "$HOOK_CODE" in
-            200|201|202|204) echo "Deploy Hook triggered." ;;
+            # 304: some CF edges reply Not Modified; treat as accepted and remind to verify Deployments
+            200|201|202|204|304)
+              echo "Deploy Hook accepted (HTTP $HOOK_CODE)."
+              if [ "$HOOK_CODE" = "304" ]; then
+                echo "::warning::Got HTTP 304. If site content is stale, open Cloudflare Pages → Deployments → Retry deployment to force a rebuild."
+              fi
+              ;;
             *)
-              echo "::error::Deploy Hook failed (HTTP $HOOK_CODE). Recreate hook and update CLOUDFLARE_DEPLOY_HOOK secret."
+              echo "::error::Deploy Hook failed (HTTP $HOOK_CODE). Recreate hook in Cloudflare Pages → Settings → Deploy hooks, then update CLOUDFLARE_DEPLOY_HOOK secret."
               exit 1
               ;;
           esac
